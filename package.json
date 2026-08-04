@@ -1,0 +1,20 @@
+{
+  "name": "supermarket-scraper",
+  "module": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start:cron": "bun src/index.ts",
+    "start:scraper:mercadona": "bun src/supermarkets/mercadona/start.ts",
+    "start:scraper:consum": "bun src/supermarkets/consum/start.ts"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "pocketbase": "^0.27.0"
+  }
+}
