@@ -30,16 +30,18 @@ export class BaseScraper implements IBaseScraper {
   }
 
   async _processProduct(raw: any, errors: any): Promise<boolean> {
-    const productId = this.normalizer.extractInternalId(raw)
+    const productId = `${this.supermarket}:${this.normalizer.extractInternalId(raw)}`
 
     try {
       await pb.saveRawProduct(this.supermarket, productId, raw)
 
-      const normalizedProduct = this.normalizer.normalize(raw)
-      await pb.saveNormalizedProduct(normalizedProduct)
+       const normalizedProduct = this.normalizer.normalize(raw)
+       normalizedProduct.product_id = productId
+       await pb.saveNormalizedProduct(normalizedProduct)
 
-      const normalizedPrice = this.normalizer.normalizePrice(raw)
-      await pb.savePrice(normalizedPrice)
+       const normalizedPrice = this.normalizer.normalizePrice(raw)
+       normalizedPrice.product_id = productId
+       await pb.savePrice(normalizedPrice)
 
       console.log(`[${this.supermarket}] Product ${productId} processed`)
       return true
