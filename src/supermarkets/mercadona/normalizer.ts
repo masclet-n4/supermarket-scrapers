@@ -38,7 +38,7 @@ export class MercadonaNormalizer implements IBaseNormalizer {
       "thumbnail": product.thumbnail,
       "photos": this._extractPhotos(product),
       "available": product.published,
-      "quantity": Number(product.price_instructions.reference_price),
+      "quantity": Number(Number(product.price_instructions.unit_price)/Number(product.price_instructions.bulk_price)).toFixed(3),
       "quantity_unit": product.price_instructions.reference_format,
       "current_price": Number(product.price_instructions.bulk_price),
       "unit_price": Number(product.price_instructions.unit_price),
