@@ -53,10 +53,11 @@ export class ConsumNormalizer implements IBaseNormalizer {
   normalizePrice(product: ConsumProduct): ProductPrice {
     return {
       "product_id": product.id.toString(),
-      "current_price": Number(product.priceData.prices[0].value.centAmount),
+      "bulk_price": Number(product.priceData.prices[0].value.centAmount),
       "unit_price": Number(product.priceData.prices[0].value.centUnitAmount),
       "unit": product.priceData.unitPriceUnitType.split(" ")[1] || "ud",
       "tax_percentage": Number(product.priceData.taxPercentage),
+      "date": new Date().toISOString().slice(0, 10),
     }
   }
 }

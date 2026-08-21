@@ -33,15 +33,15 @@ export class BaseScraper implements IBaseScraper {
     const productId = `${this.supermarket}:${this.normalizer.extractInternalId(raw)}`
 
     try {
-      await pb.saveRawProduct(this.supermarket, productId, raw)
-
        const normalizedProduct = this.normalizer.normalize(raw)
        normalizedProduct.product_id = productId
-       await pb.saveNormalizedProduct(normalizedProduct)
+       const savedProduct = await pb.saveNormalizedProduct(normalizedProduct)
+
+       await pb.saveRawProduct(savedProduct.supermarket_id, savedProduct.id, raw)
 
        const normalizedPrice = this.normalizer.normalizePrice(raw)
        normalizedPrice.product_id = productId
-       await pb.savePrice(normalizedPrice)
+       await pb.savePrice(savedProduct.id, normalizedPrice)
 
       console.log(`[${this.supermarket}] Product ${productId} processed`)
       return true

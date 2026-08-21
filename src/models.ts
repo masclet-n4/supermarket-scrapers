@@ -58,10 +58,11 @@ export interface NormalizedProduct {
 
 export interface ProductPrice {
   product_id: string;
-  current_price: number;
+  bulk_price: number;
   unit_price: number;
   unit: string | null;
   tax_percentage: number;
+  date: string;
 }
 
 export interface RawProductSnapshot {
@@ -108,6 +109,7 @@ export interface SupermarketConfig {
 }
 
 export interface Supermarket {
+  id: string;
   slug: string;
   name: string;
   enabled: boolean;

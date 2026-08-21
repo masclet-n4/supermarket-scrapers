@@ -56,10 +56,11 @@ export class MercadonaNormalizer implements IBaseNormalizer {
   normalizePrice(product: MercadonaFullProduct): ProductPrice {
     return {
       "product_id": product.id,
-      "current_price": Number(product.price_instructions.bulk_price),
+      "bulk_price": Number(product.price_instructions.bulk_price),
       "unit_price": Number(product.price_instructions.unit_price),
       "unit": product.price_instructions.reference_format,
       "tax_percentage": Number(product.price_instructions.tax_percentage),
+      "date": new Date().toISOString().slice(0, 10),
     }
   }
 }
