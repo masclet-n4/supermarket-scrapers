@@ -76,19 +76,26 @@ export type ScrapeJobStatus =
   | "running"
   | "completed"
   | "completed_with_errors"
-  | "failed";
+  | "failed"
+  | "cancelled";
 
 export interface ScrapeJobError {
-  product_id: string | null;
   message: string;
+  code?: string;
+  stage?: string;
+  retryable?: boolean;
+  entity_id?: string;
   stack_trace?: string;
 }
 
 export interface ScrapeJobDetails {
-  products_processed: number;
-  products_saved: number;
-  errors_count: number;
-  duration_seconds: number;
+  schema_version?: number;
+  products_total?: number;
+  products_processed?: number;
+  products_saved?: number;
+  products_failed?: number;
+  error_count?: number;
+  duration_ms?: number;
 }
 
 export interface ScrapeJob {
@@ -97,9 +104,9 @@ export interface ScrapeJob {
   type: `scrape:${string}`;
   status: ScrapeJobStatus;
   start_date: string;
-  end_date: string | null;
+  end_date: string;
   errors: ScrapeJobError[];
-  details: Partial<ScrapeJobDetails>;
+  details: ScrapeJobDetails;
 }
 
 export interface SupermarketConfig {
@@ -132,6 +139,6 @@ export function createNormalizedProduct(
 ): NormalizedProduct {
   return {
     ...product,
-    slug: product.slug || generateSlug(product.name, product.brand),
+    slug: product.slug || generateSlug(product.name, product.brand ?? undefined),
   };
 }

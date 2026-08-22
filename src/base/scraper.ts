@@ -3,7 +3,7 @@ import type { IBaseClient, ProductErrorHandler } from './client'
 import type { IBaseNormalizer } from './normalizer'
 
 import pb from "../persistence/pocketbase.ts"
-import type { ScrapeJob } from '../models.ts'
+import type { ScrapeJob, ScrapeJobError, ScrapeJobStatus } from '../models.ts'
 
 interface IBaseScraper {
   supermarket: string
@@ -29,7 +29,7 @@ export class BaseScraper implements IBaseScraper {
     }
   }
 
-  async _processProduct(raw: any, errors: any): Promise<boolean> {
+  async _processProduct(raw: any, errors: ScrapeJobError[]): Promise<boolean> {
     const productId = `${this.supermarket}:${this.normalizer.extractInternalId(raw)}`
 
     try {
@@ -47,11 +47,13 @@ export class BaseScraper implements IBaseScraper {
       return true
     } catch (error: any) {
       console.error(`[${this.supermarket}] Product ${productId} failed`, error)
-      errors.push({
-        product_id: productId,
-        message: error.message,
-        stack_trace: error.stack ?? '',
-      })
+       errors.push({
+         message: error.message,
+         code: 'product_error',
+         stage: 'process',
+         entity_id: productId,
+         stack_trace: error.stack ?? '',
+       })
       return false
     }
   }
@@ -59,24 +61,29 @@ export class BaseScraper implements IBaseScraper {
   async _endJob(
     jobId: string | null,
     startedAt: Date,
-    status: string,
+    status: ScrapeJobStatus,
     productsProcessed: number,
     productsSaved: number,
-    errors: any[]): Promise<void>
+    errors: ScrapeJobError[]): Promise<void>
   {
     const finishedAt = new Date();
     const summary = {
+      schema_version: 1,
       products_processed: productsProcessed,
       products_saved: productsSaved,
-      errors_count: errors.length,
-      "duration_seconds": Math.round((finishedAt.getTime() - startedAt.getTime()) / 1000)
+      products_failed: errors.length,
+      duration_ms: finishedAt.getTime() - startedAt.getTime(),
     }
 
     if (jobId) {
       await pb.updateJob(jobId, {
-        status: status,
+        status: status === 'completed' && errors.length > 0
+          ? 'completed_with_errors'
+          : status,
         end_date: finishedAt.toISOString(),
-        errors: errors,
+        errors: errors.length === 0
+          ? [{ code: 'none', message: 'No errors', stage: 'complete' }]
+          : errors,
         details: summary,
       })
     }
@@ -86,8 +93,8 @@ export class BaseScraper implements IBaseScraper {
     const startedAt = new Date()
     let productProcessed = 0
     let productsSaved = 0
-    const errors: any[] = []
-    let status = 'failed'
+    const errors: ScrapeJobError[] = []
+    let status: ScrapeJobStatus = 'failed'
 
     console.log(`[${this.supermarket}] Scraper started`)
     const jobId = await this._createJob(startedAt)
@@ -97,8 +104,10 @@ export class BaseScraper implements IBaseScraper {
         const cause = error instanceof Error ? error : new Error(String(error))
         productProcessed++
         errors.push({
-          product_id: `${this.supermarket}:${productId}`,
           message: cause.message,
+          code: 'product_error',
+          stage: 'fetch',
+          entity_id: `${this.supermarket}:${productId}`,
           stack_trace: cause.stack ?? '',
         })
       }
@@ -112,6 +121,13 @@ export class BaseScraper implements IBaseScraper {
       status = errors.length > 0 ? 'completed_with_errors' : 'completed'
     } catch (error) {
       console.error(`[${this.supermarket}] Scraper failed`, error)
+      const cause = error instanceof Error ? error : new Error(String(error))
+      errors.push({
+        message: cause.message,
+        code: 'scraper_error',
+        stage: 'run',
+        stack_trace: cause.stack ?? '',
+      })
     } finally {
       console.log(
         `[${this.supermarket}] Scraper finished: ` +

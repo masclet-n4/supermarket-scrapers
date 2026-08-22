@@ -1,5 +1,5 @@
 import PocketBase, { ClientResponseError } from 'pocketbase'
-import { type Supermarket, type ScrapeJob, type NormalizedProduct, type ProductPrice } from '../models'
+import { type Supermarket, type ScrapeJob, type ScrapeJobStatus, type ScrapeJobDetails, type ScrapeJobError, type NormalizedProduct, type ProductPrice } from '../models'
 
 const pb = new PocketBase(process.env.PB_URL)
 pb.autoCancellation(false)
@@ -28,8 +28,15 @@ const request = async <T>(fn: () => Promise<T>): Promise<T> => {
       await authenticate()
       return fn()
     }
+    if (error?.status === 400) {
+      console.error('[PocketBase] Error de validación:', JSON.stringify(error.response?.data ?? error.response, null, 2))
+    }
     throw error
   }
+}
+
+const logJobPayload = (payload: Record<string, unknown>) => {
+  console.error('[PocketBase] Payload jobs:', JSON.stringify(payload))
 }
 
 await authenticate()
@@ -52,16 +59,20 @@ const getSupermarketId = async (slug: string): Promise<string> => {
   return id
 }
 
-const createJob = async (supermarketId: string, startedAt: Date): Promise<ScrapeJob> => {
-  const job = await request(() => pb.collection<ScrapeJob>('jobs').create({
-      "type": `scrape:${supermarketId}`,
-      "status": "running",
-      "start_date": startedAt.toISOString(),
-      "end_date": null,
-      "errors": [],
-      "details": {},
-  }))
-  return job
+const createJob = async (supermarketSlug: string, startedAt: Date): Promise<ScrapeJob> => {
+  const payload = {
+    type: `scrape:${supermarketSlug}`,
+    status: 'running',
+    start_date: startedAt.toISOString(),
+    details: { schema_version: 1 },
+    errors: [{
+      code: 'job_started',
+      message: 'Job started',
+      stage: 'start',
+    }],
+  }
+  logJobPayload(payload)
+  return request(() => pb.collection<ScrapeJob>('jobs').create(payload))
 }
 
 const upsert = async (
@@ -113,7 +124,15 @@ const savePrice = async (productRecordId: string, price: ProductPrice) => {
   }))
 }
 
-const updateJob = async (jobId: string, payload: any) => {
+const updateJob = async (
+  jobId: string,
+  payload: {
+    status: ScrapeJobStatus
+    end_date: string
+    errors: ScrapeJobError[]
+    details: ScrapeJobDetails
+  },
+) => {
   await request(() => pb.collection<ScrapeJob>('jobs').update(jobId, payload))
 }
 
