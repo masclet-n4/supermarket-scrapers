@@ -1,7 +1,7 @@
 import { sleep } from 'bun'
-import { type IBaseClient } from '../../base/client'
+import { type IBaseClient, type ProductErrorHandler } from '../../base/client'
 import { categoriesUrl, headers, productsUrl } from './enums'
-import { getRandomNumberBetween } from '../../utils'
+import { fetchWithErrorHandling, getRandomNumberBetween } from '../../utils'
 import type {
   MercadonaCategoriesResponse,
   MercadonaCategoryResponse,
@@ -40,9 +40,11 @@ export class MercadonaClient implements IBaseClient<MercadonaFullProduct> {
   }
 
   async _fetchFullProduct(productId: string): Promise<MercadonaFullProduct> {
-    const response = await fetch(`${productsUrl}/${productId}/`, {
-      headers,
-    })
+    const response = await fetchWithErrorHandling(
+      `${productsUrl}/${productId}/`,
+      { headers },
+      { 504: (attempt) => [5_000, 15_000][attempt] },
+    )
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.url}`)
@@ -55,7 +57,7 @@ export class MercadonaClient implements IBaseClient<MercadonaFullProduct> {
     throw new Error(`Not implemented: category ${categoryId}`)
   }
 
-  async *fetchProducts(): AsyncIterable<MercadonaFullProduct> {
+  async *fetchProducts(onProductError?: ProductErrorHandler): AsyncIterable<MercadonaFullProduct> {
     const categories = await this._fetchCategories()
 
     for (const category of categories.results) {
@@ -68,8 +70,12 @@ export class MercadonaClient implements IBaseClient<MercadonaFullProduct> {
           for (const product of subcategoryProducts.products) {
             const waitTime = getRandomNumberBetween(100, 300)
             await sleep(waitTime)
-            const fullProduct = await this._fetchFullProduct(product.id)
-            yield fullProduct
+            try {
+              yield await this._fetchFullProduct(product.id)
+            } catch (error) {
+              if (!onProductError) throw error
+              onProductError({ productId: String(product.id), error })
+            }
           }
         }
 

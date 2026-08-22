@@ -1,5 +1,5 @@
 
-import type { IBaseClient } from './client'
+import type { IBaseClient, ProductErrorHandler } from './client'
 import type { IBaseNormalizer } from './normalizer'
 
 import pb from "../persistence/pocketbase.ts"
@@ -7,14 +7,14 @@ import type { ScrapeJob } from '../models.ts'
 
 interface IBaseScraper {
   supermarket: string
-  client: IBaseClient
+  client: IBaseClient<any>
   normalizer: IBaseNormalizer
 }
 
 export class BaseScraper implements IBaseScraper {
   constructor(
     public supermarket: string,
-    public client: IBaseClient,
+    public client: IBaseClient<any>,
     public normalizer: IBaseNormalizer,
   ) { }
 
@@ -93,7 +93,17 @@ export class BaseScraper implements IBaseScraper {
     const jobId = await this._createJob(startedAt)
 
     try {
-      for await (const product of this.client.fetchProducts()) {
+      const onProductError: ProductErrorHandler = ({ productId, error }) => {
+        const cause = error instanceof Error ? error : new Error(String(error))
+        productProcessed++
+        errors.push({
+          product_id: `${this.supermarket}:${productId}`,
+          message: cause.message,
+          stack_trace: cause.stack ?? '',
+        })
+      }
+
+      for await (const product of this.client.fetchProducts(onProductError)) {
         productProcessed++
         if (await this._processProduct(product, errors)) {
           productsSaved++
