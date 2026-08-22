@@ -68,7 +68,7 @@ export class MercadonaClient implements IBaseClient<MercadonaFullProduct> {
       const subcategoriesProducts = await this._fetchSubcategoryProducts(subcategory.id)
         for (const subcategoryProducts of subcategoriesProducts.categories) {
           for (const product of subcategoryProducts.products) {
-            const waitTime = getRandomNumberBetween(100, 300)
+            const waitTime = getRandomNumberBetween(0, 100)
             await sleep(waitTime)
             try {
               yield await this._fetchFullProduct(product.id)

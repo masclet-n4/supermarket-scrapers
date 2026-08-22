@@ -85,6 +85,12 @@ export interface ScrapeJobError {
   stage?: string;
   retryable?: boolean;
   entity_id?: string;
+  collection?: string;
+  operation?: string;
+  http_status?: number;
+  field?: string;
+  validation?: JsonObject;
+  response?: JsonObject;
   stack_trace?: string;
 }
 

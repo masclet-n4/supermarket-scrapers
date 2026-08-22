@@ -5,6 +5,34 @@ import type { IBaseNormalizer } from './normalizer'
 import pb from "../persistence/pocketbase.ts"
 import type { ScrapeJob, ScrapeJobError, ScrapeJobStatus } from '../models.ts'
 
+const persistenceError = (error: any, productId: string): ScrapeJobError => {
+  const response = error?.response?.data ?? error?.response
+  const fieldErrors = response?.data ?? response?.errors
+  const firstFieldError = fieldErrors && typeof fieldErrors === 'object'
+    ? Object.entries(fieldErrors)[0]
+    : undefined
+  const [field, detail] = firstFieldError ?? []
+  const detailMessage = detail && typeof detail === 'object' && 'message' in detail
+    ? String(detail.message)
+    : undefined
+
+  return {
+    code: 'product_error',
+    message: detailMessage ?? response?.message ?? error?.message ?? String(error),
+    stage: 'process',
+    entity_id: productId,
+    collection: error?.url?.match(/collections\/([^/]+)/)?.[1],
+    operation: error?.url?.includes('/records/') ? 'update' : 'create',
+    http_status: error?.status,
+    response: response && typeof response === 'object' ? response : undefined,
+    ...(field ? { field } : {}),
+    ...(detail && typeof detail === 'object'
+      ? { validation: detail as Record<string, unknown> }
+      : {}),
+    stack_trace: error?.stack,
+  }
+}
+
 interface IBaseScraper {
   supermarket: string
   client: IBaseClient<any>
@@ -47,13 +75,7 @@ export class BaseScraper implements IBaseScraper {
       return true
     } catch (error: any) {
       console.error(`[${this.supermarket}] Product ${productId} failed`, error)
-       errors.push({
-         message: error.message,
-         code: 'product_error',
-         stage: 'process',
-         entity_id: productId,
-         stack_trace: error.stack ?? '',
-       })
+        errors.push(persistenceError(error, productId))
       return false
     }
   }
