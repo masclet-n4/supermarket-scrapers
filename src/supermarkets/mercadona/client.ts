@@ -8,6 +8,27 @@ import type {
   MercadonaFullProduct,
 } from './models'
 
+const diagnosticHeaders = (response: Response) => Object.fromEntries(
+  [...response.headers.entries()]
+    .filter(([name]) => name.toLowerCase() !== 'set-cookie')
+)
+
+const throwHttpError = async (response: Response): Promise<never> => {
+  const body = (await response.text()).slice(0, 2_000)
+
+  console.error('[mercadona] HTTP request failed', {
+    status: response.status,
+    statusText: response.statusText,
+    url: response.url,
+    body,
+    headers: diagnosticHeaders(response),
+  })
+
+  throw new Error(
+    `HTTP ${response.status}: ${response.url}${body ? ` - ${body.slice(0, 500)}` : ''}`,
+  )
+}
+
 
 
 export class MercadonaClient implements IBaseClient<MercadonaFullProduct> {
@@ -19,7 +40,7 @@ export class MercadonaClient implements IBaseClient<MercadonaFullProduct> {
       headers,
     })
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.url}`)
+      await throwHttpError(response)
     }
 
     return await response.json() as MercadonaCategoriesResponse
@@ -33,7 +54,7 @@ export class MercadonaClient implements IBaseClient<MercadonaFullProduct> {
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.url}`)
+      await throwHttpError(response)
     }
 
     return await response.json() as MercadonaCategoryResponse
@@ -47,7 +68,7 @@ export class MercadonaClient implements IBaseClient<MercadonaFullProduct> {
     )
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.url}`)
+      await throwHttpError(response)
     }
 
     return await response.json() as MercadonaFullProduct
@@ -63,12 +84,12 @@ export class MercadonaClient implements IBaseClient<MercadonaFullProduct> {
     for (const category of categories.results) {
       const subcategories = category.categories;
       for (const subcategory of subcategories) {
-      const waitTime = getRandomNumberBetween(100, 300)
+      const waitTime = getRandomNumberBetween(300, 500)
       await sleep(waitTime)
       const subcategoriesProducts = await this._fetchSubcategoryProducts(subcategory.id)
         for (const subcategoryProducts of subcategoriesProducts.categories) {
           for (const product of subcategoryProducts.products) {
-            const waitTime = getRandomNumberBetween(0, 100)
+            const waitTime = getRandomNumberBetween(300, 700)
             await sleep(waitTime)
             try {
               yield await this._fetchFullProduct(product.id)
